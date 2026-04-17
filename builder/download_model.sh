@@ -21,8 +21,7 @@ mkdir -p "$MODEL_DIR"
 # Support both old and new CLI
 if command -v hf &>/dev/null; then
     HF_HUB_ENABLE_HF_TRANSFER=1 hf download "$MODEL_ID" \
-        --local-dir "$MODEL_DIR" \
-        --local-dir-use-symlinks False
+        --local-dir "$MODEL_DIR"
 else
     HF_HUB_ENABLE_HF_TRANSFER=1 huggingface-cli download "$MODEL_ID" \
         --local-dir "$MODEL_DIR" \
