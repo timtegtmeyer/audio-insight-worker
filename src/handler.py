@@ -170,14 +170,20 @@ def handler(job: dict) -> dict:
 
     y_full, sr = librosa.load(tmp.name, sr=16000, mono=True)
 
+    # Every segment produces either an insight dict, OR an error dict
+    # { "error": "<reason>", "segment_duration_sec": <float> } so the tenant
+    # side can tell WHY a segment null'd out instead of getting silent nulls.
     results: list[dict[str, str] | None] = []
+    error_counts: dict[str, int] = {}
     for seg in segments:
         start_sample = int(seg["start"] * sr)
         end_sample = int(seg["end"] * sr)
         y_seg = y_full[start_sample:end_sample]
+        seg_duration = len(y_seg) / float(sr) if sr > 0 else 0.0
 
         if len(y_seg) < sr * 0.5:  # skip < 500ms
-            results.append(None)
+            results.append({"error": "segment_too_short", "segment_duration_sec": round(seg_duration, 2)})
+            error_counts["segment_too_short"] = error_counts.get("segment_too_short", 0) + 1
             continue
 
         try:
@@ -185,15 +191,24 @@ def handler(job: dict) -> dict:
             results.append(insight)
             log.info("Segment %.1f-%.1f: tone=%s intent=%s", seg["start"], seg["end"], insight.get("tone"), insight.get("intent"))
         except Exception as exc:
-            log.warning("Failed to analyze segment %.1f-%.1f: %s", seg["start"], seg["end"], exc)
-            results.append(None)
+            error_type = type(exc).__name__
+            log.warning("Failed to analyze segment %.1f-%.1f (%s): %s", seg["start"], seg["end"], error_type, exc)
+            results.append({"error": error_type, "message": str(exc)[:300]})
+            error_counts[error_type] = error_counts.get(error_type, 0) + 1
 
     os.unlink(tmp.name)
 
-    analyzed = sum(1 for r in results if r is not None)
-    log.info("Done: %d/%d segments analyzed", analyzed, len(segments))
+    analyzed = sum(1 for r in results if isinstance(r, dict) and "error" not in r)
+    log.info("Done: %d/%d segments analyzed, errors=%s", analyzed, len(segments), error_counts)
 
-    return {"insights": results}
+    return {
+        "insights": results,
+        "diagnostics": {
+            "segments_total": len(segments),
+            "segments_analyzed": analyzed,
+            "error_counts": error_counts,
+        },
+    }
 
 
 runpod.serverless.start({"handler": handler})

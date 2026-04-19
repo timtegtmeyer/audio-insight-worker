@@ -14,6 +14,7 @@ build: ## Build, push to GHCR, capture digest, tag
 	echo $$NEW > .version; \
 	echo "Building v$$NEW..."; \
 	docker buildx build --builder $(BUILDER) --platform linux/amd64 --push \
+		--progress=plain \
 		--secret id=HF_TOKEN,env=HF_TOKEN \
 		-t $(GHCR_IMAGE):v$$NEW \
 		-t $(GHCR_IMAGE):latest \
