@@ -1,4 +1,7 @@
-FROM pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime@sha256:c8268a92a69bd500f8be0e665b2630ee006dadaf7bfbc24249141b15ff622755
+FROM pytorch/pytorch:2.8.0-cuda12.8-cudnn9-runtime
+# torch 2.8 + CUDA 12.8 is the minimum combination that supports Blackwell
+# (sm_100 / sm_120) — RTX 5090 workers would otherwise hang in "initializing"
+# because 2.5.1-cu124 has no kernels for the GPU it landed on.
 
 ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /app
